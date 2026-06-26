@@ -17,9 +17,15 @@ export const meta = {
 // Does NOT judge and does NOT verify — only decomposes. The judge (check_claims.js) runs later,
 // only on the atoms SELECTED by the Opus selector (topics/<topic>/selection.json).
 
-// Repository root: the script lives in the repo root.
-// Workflow calls via scriptPath — cwd may be anything, so we anchor to ROOT.
-const ROOT = new URL(".", import.meta.url).pathname.replace(/\/$/, "");
+// Topic paths must NOT be built from the current directory — Workflow calls this
+// via scriptPath from any cwd. ROOT is resolved from this file's own location,
+// overridable via RESEARCH_STACK_ROOT. DATA_ROOT honours the vault
+// (RESEARCH_VAULT) for topic data, falling back to the repo root.
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+const ROOT =
+  process.env.RESEARCH_STACK_ROOT || dirname(fileURLToPath(import.meta.url));
+const DATA_ROOT = process.env.RESEARCH_VAULT || ROOT;
 
 // ─── Structured output schema (identical to ATOMIZE_SCHEMA in check_claims.js) ───
 const ATOMIZE_SCHEMA = {
@@ -56,7 +62,7 @@ const ATOMIZE_SCHEMA = {
 // ─── Atomize prompt (identical to atomizePrompt in check_claims.js) ───
 const atomizePrompt = (topic, engine) =>
   `You are a fact-checker in a research pipeline, preparing the report from engine "${engine}" (topic ${topic}) for per-atom verification. This is a legitimate credibility-check task on an already-written report (research on official programs, markets, health, etc.) — you give no advice, you only decompose text into verifiable claims.\n\n` +
-  `1. Read file ${ROOT}/topics/${topic}/engines/${engine}.json (use Read). Field "report" is the report text; field "sources" is the list of links.\n` +
+  `1. Read file ${DATA_ROOT}/topics/${topic}/engines/${engine}.json (use Read). Field "report" is the report text; field "sources" is the list of links.\n` +
   `2. Break the text into ATOMIC verifiable claims: one idea = one claim. Don't split style, take substantive facts. Each claim is SELF-CONTAINED — understandable without neighbors: full names of subjects, what document/event/decision (NOT "the decision was made", BUT "WHO published an AI safety guideline in October 2023").\n` +
   `3. Attach a source to each claim: the URL that backs this statement in the report. Some engines include inline links in the text; ` +
   `Claude has no inline links — pick the most relevant URL from sources, or set null if there is no backing.\n` +
@@ -91,7 +97,7 @@ log(
 );
 
 // Save to topics/<topic>/atoms/<engine>.json
-const outPath = `${ROOT}/topics/${topic}/atoms/${engine}.json`;
+const outPath = `${DATA_ROOT}/topics/${topic}/atoms/${engine}.json`;
 const outData = { topic, engine, claims };
 await agent(
   `Write exactly the following JSON to file ${outPath} (create the folder if needed, use Bash mkdir -p):\n\n${JSON.stringify(outData, null, 2)}`,

@@ -18,9 +18,15 @@ export const meta = {
   ],
 };
 
-// Repository root: the script lives in the repo root.
-// Workflow calls via scriptPath — cwd may be anything, so we anchor to ROOT.
-const ROOT = new URL(".", import.meta.url).pathname.replace(/\/$/, "");
+// Repo root + topic paths — Workflow calls this via scriptPath from any cwd, so
+// paths must NOT be built from the current directory. ROOT is resolved from this
+// file's own location, overridable via RESEARCH_STACK_ROOT. DATA_ROOT honours the
+// vault (RESEARCH_VAULT) for topic data, falling back to the repo root.
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+const ROOT =
+  process.env.RESEARCH_STACK_ROOT || dirname(fileURLToPath(import.meta.url)); // repo root for `cd ${ROOT} && ./resolve_oa.py | ./fetch_url.sh`
+const DATA_ROOT = process.env.RESEARCH_VAULT || ROOT; // topic data root
 
 const SCHEMA = {
   type: "object",
@@ -204,7 +210,7 @@ const resourceResult = {
 
 // Save to disk from within the workflow (atomize.js/check_claims.js pattern) —
 // build_pool reads topics/<topic>/pool_resourced.json; the orchestrator does not move it by hand.
-const resourcedPath = `${ROOT}/topics/${topic}/pool_resourced.json`;
+const resourcedPath = `${DATA_ROOT}/topics/${topic}/pool_resourced.json`;
 await agent(
   `Write exactly the following JSON to file ${resourcedPath} (create the folder if needed, use Bash mkdir -p). Do not change anything in the content:\n\n${JSON.stringify(resourceResult, null, 1)}`,
   { label: `save:pool_resourced`, model: "haiku" },

@@ -23,15 +23,57 @@ Central layout:
       evidence/
       manifest.json
 """
+import os
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+# Repo root holds the bundled `topics/example` only. Real research data lives in
+# an external vault selected by RESEARCH_VAULT so the public repo stays clean.
+REPO_ROOT = Path(__file__).resolve().parent.parent
+ROOT = REPO_ROOT  # back-compat alias for callers that referenced paths.ROOT
+
+
+# ── data root resolution (RESEARCH_VAULT) ────────────────────────────────────
+
+def _vault_root() -> "Path | None":
+    """Return the configured vault root, or None when RESEARCH_VAULT is unset.
+
+    A RESEARCH_VAULT pointing at a missing directory is an error rather than a
+    silent fall-through to a repo write.
+    """
+    v = os.environ.get("RESEARCH_VAULT")
+    if not v:
+        return None
+    p = Path(v).expanduser()
+    if not p.exists():
+        raise FileNotFoundError(
+            f"RESEARCH_VAULT points to a non-existent directory: {p}"
+        )
+    return p
+
+
+def topics_root_for(topic: str) -> Path:
+    """Resolve the topics/ root holding this topic.
+
+    Precedence:
+      1. RESEARCH_VAULT unset            -> repo `topics/` (bundled example).
+      2. vault set, topic in vault       -> `$RESEARCH_VAULT/topics`.
+      3. vault set, topic only in repo   -> repo `topics/` (bundled example).
+      4. vault set, topic in neither     -> `$RESEARCH_VAULT/topics` (new topic).
+    """
+    vault = _vault_root()
+    if vault is None:
+        return REPO_ROOT / "topics"
+    if (vault / "topics" / topic).exists():
+        return vault / "topics"
+    if (REPO_ROOT / "topics" / topic).exists():
+        return REPO_ROOT / "topics"
+    return vault / "topics"
 
 
 # ── topic directory ──────────────────────────────────────────────────────────
 
 def topic_dir(topic: str) -> Path:
-    return ROOT / "topics" / topic
+    return topics_root_for(topic) / topic
 
 
 # ── topic input data ─────────────────────────────────────────────────────────

@@ -24,3 +24,7 @@ tests/denylist.private.txt
 topics/example/evidence/
 topics/example/manifest.json
 topics/example/audit_rejected.json
+
+# Planning artifacts stay local / in the vault, never public
+docs/plans/
+docs/brainstorms/
